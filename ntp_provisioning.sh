@@ -97,23 +97,27 @@ function pullDockerImages() {
 	docker pull nginx
 }
 
-# $1 - Array of external NTP servers which will be used to sync the NTP nodes
+# $1 - Array reference of external NTP servers which will be used to sync the NTP nodes
 function configureChronyConf() {
 	echo "Configuring chrony.conf..."
+	local -n serverz=$1
+
 	cp chrony.conf /etc/chrony.conf
 	serverConfig=""
-	for srv in "${1[@]}"; do
+	for srv in "${serverz[@]}"; do
 		serverConfig="${serverConfig} \nserver ${srv} iburst"
 	done
 	sed -i -e "s|{{servers}}|$serverConfig|g" /etc/chrony.conf
 }
 
-# $1 - Array of NTP node IP addresses
+# $1 - Array reference of NTP node IP addresses
 function configureNginx() {
 	echo "Configuring nginx.conf..."
+	local -n nodez=$1
+
 	cp nginx.conf /etc/nginx.conf
 	ntpNodes=""
-	for ip in "${1[@]}"; do
+	for ip in "${nodez[@]}"; do
 		ntpNodes="${ntpNodes} \nserver ${ip}:123;"
 	done
 	sed -i -e "s|{{ntp_nodes}}|$ntpNodes|g" /etc/nginx.conf
@@ -148,25 +152,31 @@ function runChronyDocker() {
 	cwadley/alpine-chrony
 }
 
-# $1 - Array of external NTP servers which will be used to sync the NTP nodes
+# $1 - Array reference of external NTP servers which will be used to sync the NTP nodes
 # $2 - NTP network name
 # $3 - NTP network CIDR
-# $4 - Array of NTP node IP addresses (array length is the number of nodes that will be spun up)
+# $4 - Array reference of NTP node IP addresses (array length is the number of nodes that will be spun up)
 # $5 - IP address for the Load Balancer
 function ConfigureMachine() {
+	local -n syncServerz=$1
+	local networkName=$2
+	local networkCidr=$3
+	local -n chronyNodez=$4
+	local loadBalancerIp=$5
+
 	updateAndInstallDocker
 	enableIPTABLES
 	configureIPTABLES
 	pullDockerImages
-	configureChronyConf $1
-	configureNginx $4
-	setUpDockerNetwork $2 $3 $5
+	configureChronyConf syncServerz
+	configureNginx chronyNodez
+	setUpDockerNetwork $networkName $networkCidr $loadBalancerIp
 
 	i=0
-	for node_ip in "${4[@]}"; do
-		runChronyDocker "chrony_$i" "$node_ip" $2
+	for node_ip in "${chronyNodez[@]}"; do
+		runChronyDocker "chrony_$i" "$node_ip" $networkName
 		((i++))
 	done
 }
 
-ConfigureMachine $sync_servers $ntp_cluster $ntp_loadbalancer
+ConfigureMachine sync_servers $ntp_network $ntp_network_CIDR ntp_cluster $ntp_loadbalancer
