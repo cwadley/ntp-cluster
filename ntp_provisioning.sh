@@ -4,7 +4,7 @@
 # Edit these variables
 
 # Array of the domains or IP addresses of the external NTP servers that will be used to sync each chrony node
-sync_servers=("time-b.nist.gov" "us-ny.ntp.dark-net.io" "e.time.steadfast.net" "fuzz.psc.edu" "clock.psu.edu" "bonehed.lcs.mit.edu")
+declare -a sync_servers=("time-b.nist.gov" "us-ny.ntp.dark-net.io" "e.time.steadfast.net" "fuzz.psc.edu" "clock.psu.edu" "bonehed.lcs.mit.edu")
 # Friendly name of the Docker network the cluster will share
 ntp_network="ntp_cluster"
 # CIDR of the address range covered by the Docker network (ex. 192.168.0.0/24)
@@ -12,10 +12,12 @@ ntp_network_CIDR=192.168.0.0/24
 # Docker network IP address of the nginx loadbalancer container (must be within the network CIDR range)
 ntp_loadbalancer=192.168.0.1
 # Array of the IP addresses of the chrony nodes in the cluster (must be within the network CIDR range. Node count is inferred from the array length)
-ntp_cluster=(192.168.0.2 192.168.0.3 192.168.0.4 192.168.0.5)
+declare -a ntp_cluster=(192.168.0.2 192.168.0.3 192.168.0.4 192.168.0.5)
 
 function updateAndInstallDocker() {
-	yum update
+	echo "Updating machine..."
+	yum update -y
+	echo "Installing Docker..."
 	yum install -y yum-utils device-mapper-persistent-data lvm2
 	yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
 	yum install -y docker-ce
@@ -24,8 +26,10 @@ function updateAndInstallDocker() {
 }
 
 function enableIPTABLES() {
+	echo "Disabling firewalld..."
 	systemctl stop firewalld
 	systemctl mask firewalld
+	echo "Installing and enabling iptables..."
 	yum install -y iptables-services
 	systemctl enable iptables
 	systemctl enable ip6tables
@@ -88,12 +92,14 @@ function configureIPTABLES() {
 }
 
 function pullDockerImages() {
+	echo "Pulling chrony and nginx docker images..."
 	docker pull cwadley/alpine-chrony
 	docker pull nginx
 }
 
 # $1 - Array of external NTP servers which will be used to sync the NTP nodes
 function configureChronyConf() {
+	echo "Configuring chrony.conf..."
 	cp chrony.conf /etc/chrony.conf
 	serverConfig=""
 	for srv in "${1[@]}"; do
@@ -104,6 +110,7 @@ function configureChronyConf() {
 
 # $1 - Array of NTP node IP addresses
 function configureNginx() {
+	echo "Configuring nginx.conf..."
 	cp nginx.conf /etc/nginx.conf
 	ntpNodes=""
 	for ip in "${1[@]}"; do
@@ -116,6 +123,7 @@ function configureNginx() {
 # $2 - NTP network CIDR
 # $3 - LoadBalancer IP
 function setUpDockerNetwork() {
+	echo "Setting up Docker network..."
 	docker network create --subnet=$2 $1
 	docker run -d \
 	--name nginx \
@@ -130,14 +138,14 @@ function setUpDockerNetwork() {
 # $1 - Node name
 # $2 - Node IP
 # $3 - NTP network name
-function runNTPDocker() {
+function runChronyDocker() {
+	echo "Running chrony container node: $1"
 	docker run -d \
 	--name $1 \
 	--network $3 \
 	--ip $2 \
 	-v /etc/ntp.conf:/etc/ntp.conf:ro \
-	-v /var/log/ntpd:/var/log/ntpd \
-	cturra/ntp
+	cwadley/alpine-chrony
 }
 
 # $1 - Array of external NTP servers which will be used to sync the NTP nodes
@@ -149,14 +157,14 @@ function ConfigureMachine() {
 	updateAndInstallDocker
 	enableIPTABLES
 	configureIPTABLES
-	pullAndBuildDockerImages
+	pullDockerImages
 	configureChronyConf $1
 	configureNginx $4
 	setUpDockerNetwork $2 $3 $5
 
 	i=0
 	for node_ip in "${4[@]}"; do
-		runNTPDocker "ntpd_$i" $node_ip $2
+		runChronyDocker "chrony_$i" "$node_ip" $2
 		((i++))
 	done
 }
