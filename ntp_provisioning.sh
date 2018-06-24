@@ -117,7 +117,7 @@ function configureNginx() {
 
 	cp nginx.conf /etc/nginx.conf
 	ntpNodes=""
-	for ip in "${1[@]}"; do
+	for ip in "${nodez[@]}"; do
 		ntpNodes="${ntpNodes} \nserver ${ip}:123;"
 	done
 	sed -i -e "s|{{ntp_nodes}}|$ntpNodes|g" /etc/nginx.conf
