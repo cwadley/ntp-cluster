@@ -1,18 +1,7 @@
 #!/bin/bash
+# provision_cluster.sh
 # Configures CentOS to run an NTP pool server as a docker container using chrony
-
-# Edit these variables
-
-# Array of the domains or IP addresses of the external NTP servers that will be used to sync each chrony node
-declare -a sync_servers=("time-b.nist.gov" "us-ny.ntp.dark-net.io" "e.time.steadfast.net" "fuzz.psc.edu" "clock.psu.edu" "bonehed.lcs.mit.edu")
-# Friendly name of the Docker network the cluster will share
-ntp_network="ntp_cluster"
-# CIDR of the address range covered by the Docker network (ex. 192.168.0.0/24)
-ntp_network_CIDR=192.168.0.0/24
-# Docker network IP address of the nginx loadbalancer container (must be within the network CIDR range)
-ntp_loadbalancer=192.168.0.2
-# Array of the IP addresses of the chrony nodes in the cluster (must be within the network CIDR range. Node count is inferred from the array length)
-declare -a chrony_cluster=(192.168.0.3 192.168.0.4 192.168.0.5 192.168.0.6)
+source chrony_vars.sh
 
 function updateAndInstallDocker() {
 	echo "Updating machine..."
@@ -125,14 +114,19 @@ function configureNginx() {
 
 # $1 - NTP network name
 # $2 - NTP network CIDR
-# $3 - LoadBalancer IP
 function setUpDockerNetwork() {
 	echo "Setting up Docker network..."
 	docker network create --subnet=$2 $1
+}
+
+# $1 - NTP network name
+# $2 - LoadBalancer IP
+function runNginxLoadbalancer() {
+	echo "Running NGINX loadbalancer..."
 	docker run -d \
 	--name nginx \
 	--network $1 \
-	--ip $3 \
+	--ip $2 \
 	-p 123:123/udp \
 	-v /etc/nginx.cfg:/etc/nginx/nginx.conf:ro \
 	-v /var/log/nginx:/var/log/nginx \
@@ -142,7 +136,7 @@ function setUpDockerNetwork() {
 # $1 - Node name
 # $2 - Node IP
 # $3 - NTP network name
-function runChronyDocker() {
+function runChronyNode() {
 	echo "Running chrony container node: $1"
 	docker run -d \
 	--name $1 \
@@ -162,11 +156,12 @@ function ConfigureMachine() {
 	pullDockerImages
 	configureChronyConf "${sync_servers[@]}"
 	configureNginx "${chrony_cluster[@]}"
-	setUpDockerNetwork $ntp_network $ntp_network_CIDR $ntp_loadbalancer
+	setUpDockerNetwork $network_name $network_CIDR
+	runNginxLoadbalancer $network_name $loadbalancer
 
 	i=0
 	for node_ip in "${chrony_cluster[@]}"; do
-		runChronyDocker "chrony_$i" "$node_ip" $ntp_network
+		runChronyNode "chrony_$i" "$node_ip" $network_name
 		((i++))
 	done
 }
