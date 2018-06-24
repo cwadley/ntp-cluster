@@ -10,9 +10,9 @@ ntp_network="ntp_cluster"
 # CIDR of the address range covered by the Docker network (ex. 192.168.0.0/24)
 ntp_network_CIDR=192.168.0.0/24
 # Docker network IP address of the nginx loadbalancer container (must be within the network CIDR range)
-ntp_loadbalancer=192.168.0.1
+ntp_loadbalancer=192.168.0.2
 # Array of the IP addresses of the chrony nodes in the cluster (must be within the network CIDR range. Node count is inferred from the array length)
-declare -a chrony_cluster=(192.168.0.2 192.168.0.3 192.168.0.4 192.168.0.5)
+declare -a chrony_cluster=(192.168.0.3 192.168.0.4 192.168.0.5 192.168.0.6)
 
 function updateAndInstallDocker() {
 	echo "Updating machine..."
@@ -149,6 +149,9 @@ function runChronyDocker() {
 	--network $3 \
 	--ip $2 \
 	-v /etc/ntp.conf:/etc/ntp.conf:ro \
+	--cap-add SYS_NICE \
+    --cap-add SYS_TIME \
+    --cap-add SYS_RESOURCE \
 	cwadley/alpine-chrony
 }
 
