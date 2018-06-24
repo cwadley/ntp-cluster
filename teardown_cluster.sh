@@ -23,13 +23,13 @@ function removeNetwork() {
 
 function TearDownCluster() {
 	nodeCount=${#chrony_cluster[@]}
-	stopContainer $loadbalancer
+	stopContainer "nginx"
 
 	for (( i=0; i<${nodeCount}; i++ )); do
 		stopContainer "chrony_$i"
 	done
 
-	removeContainer $loadbalancer
+	removeContainer "nginx"
 
 	for (( i=0; i<${nodeCount}; i++ )); do
 		removeContainer "chrony_$i"
