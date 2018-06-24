@@ -128,7 +128,7 @@ function runNginxLoadbalancer() {
 	--network $1 \
 	--ip $2 \
 	-p 123:123/udp \
-	-v /etc/nginx.cfg:/etc/nginx/nginx.conf:ro \
+	-v /etc/nginx.conf:/etc/nginx/nginx.conf:ro \
 	-v /var/log/nginx:/var/log/nginx \
 	nginx
 }
