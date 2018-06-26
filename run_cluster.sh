@@ -33,7 +33,7 @@ function runChronyNode() {
 	--name $1 \
 	--network $3 \
 	--ip $2 \
-	-v /etc/ntp.conf:/etc/ntp.conf:ro \
+	-v /etc/chrony.conf:/etc/chrony/chrony.conf:ro \
 	--cap-add SYS_NICE \
     --cap-add SYS_TIME \
     --cap-add SYS_RESOURCE \
