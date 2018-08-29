@@ -21,3 +21,5 @@ function runSingleChronyNode() {
 function RunSingleChronyNode() {
 	runSingleChronyNode "single_chrony" "${chrony_cluster[0]}"
 }
+
+RunSingleChronyNode
