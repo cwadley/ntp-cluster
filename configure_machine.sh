@@ -100,7 +100,7 @@ function configureChronyConf() {
 	sed -i -e "s|{{servers}}|$serverConfig|g" /etc/chrony.conf
 }
 
-# $1 - Array reference of NTP node IP addresses
+# $1 - Array reference of NTP node addresses
 function configureNginx() {
 	echo "Configuring nginx.conf..."
 	local nodez=("$@")
